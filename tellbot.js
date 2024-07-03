@@ -11,27 +11,53 @@ let latestMessage = "";
 let previousMessage = "";
 let messageTimestamp = Date.now();
 
-// Telegram bot token
-const token = process.env.TELEGRAM_BOT_TOKEN;
+const users = {};
 
-// Create a bot that uses 'polling' to fetch new updates
+const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(
     msg.chat.id,
-    "Hello! Send me a message and I will display it on the website."
+    "Welcome! Please log in using /login <password>"
   );
 });
 
-bot.on("message", (msg) => {
-  if (msg.text !== "/start") {
-    previousMessage = latestMessage;
-    latestMessage = msg.text;
-    messageTimestamp = Date.now();
-    bot.sendMessage(msg.chat.id, `Message received: ${msg.text}`);
-    broadcast({ latestMessage, previousMessage, messageTimestamp });
+bot.onText(/\/login (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const password = match[1];
+
+  if (password === process.env.BOT_PASSWORD) {
+    users[chatId] = true;
+    bot.sendMessage(
+      chatId,
+      "Login successful! Send me a message and I will display it on the website."
+    );
+  } else {
+    bot.sendMessage(chatId, "Invalid password. Please try again.");
   }
+});
+
+bot.on("message", (msg) => {
+  const chatId = msg.chat.id;
+
+  // Ignore messages that start with /start or /login commands
+  if (msg.text.startsWith("/start") || msg.text.startsWith("/login")) {
+    return;
+  }
+
+  // Check if the user is logged in
+  if (!users[chatId]) {
+    bot.sendMessage(chatId, "Please log in first using /login <password>");
+    return;
+  }
+
+  // Handle other messages if the user is logged in
+  previousMessage = latestMessage;
+  latestMessage = msg.text;
+  messageTimestamp = Date.now();
+  bot.sendMessage(chatId, `Message received: ${msg.text}`);
+  broadcast({ latestMessage, previousMessage, messageTimestamp });
 });
 
 app.use(cors());
