@@ -12,6 +12,9 @@ let previousMessage = "";
 let messageTimestamp = Date.now();
 
 const users = {};
+const adminUserIds = process.env.ADMIN_USER_IDS.split(",").map((id) =>
+  id.trim()
+);
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
@@ -40,6 +43,7 @@ bot.onText(/\/login (.+)/, (msg, match) => {
 
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
+  const senderName = msg.from.username || msg.from.first_name;
 
   // Ignore messages that start with /start or /login commands
   if (msg.text.startsWith("/start") || msg.text.startsWith("/login")) {
@@ -52,11 +56,18 @@ bot.on("message", (msg) => {
     return;
   }
 
+  // Notify only admin users about the message
+  adminUserIds.forEach((adminId) => {
+    bot.sendMessage(
+      adminId,
+      `Message received from ${senderName}: ${msg.text}`
+    );
+  });
+
   // Handle other messages if the user is logged in
   previousMessage = latestMessage;
   latestMessage = msg.text;
   messageTimestamp = Date.now();
-  bot.sendMessage(chatId, `Message received: ${msg.text}`);
   broadcast({ latestMessage, previousMessage, messageTimestamp });
 });
 
